@@ -90,6 +90,17 @@
       margin-top: 4px;
       display: none;
     }
+    .verify-hint {
+      font-size: 12px;
+      margin-top: 4px;
+      display: none;
+    }
+    .verify-success {
+      color: #4ade80;
+    }
+    .verify-fail {
+      color: #fca5a5;
+    }
     input, textarea, .param-input, select {
       width: 100%;
       padding: 14px 16px;
@@ -264,6 +275,19 @@
       min-height: 100px;
       font-size: 12px;
     }
+    /* 签名区域样式 */
+    .signature-area {
+      margin-bottom: 28px;
+      padding: 20px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+    }
+    .signature-title {
+      font-size: 14px;
+      color: #d1d5db;
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
     .toast {
       position: fixed;
       bottom: 40px;
@@ -317,13 +341,11 @@
 <body>
   <div class="container">
     <h1>加解密工具</h1>
-
     <!-- 文本/文件切换标签 -->
     <div class="tab-group">
       <button class="tab active" data-type="text">文本加解密</button>
       <button class="tab" data-type="file">文件加解密</button>
     </div>
-
     <!-- 算法选择 + 主密钥 -->
     <div class="row">
       <div class="group">
@@ -341,7 +363,6 @@
         <input id="main-key" placeholder="请输入密钥">
       </div>
     </div>
-
     <!-- 扩展参数区域 -->
     <div class="ext-params">
       <!-- 凯撒偏移量 -->
@@ -366,7 +387,6 @@
         <input id="iv-input" value="1234567890123456" placeholder="如16位字符串（AES）/8位（DES）" class="param-input">
       </div>
     </div>
-
     <!-- RSA密钥对区域 -->
     <div class="rsa-keys" id="rsa-keys-area" style="display: none;">
       <div class="rsa-key-item">
@@ -378,16 +398,29 @@
         <textarea id="rsa-private-key" readonly placeholder="生成的私钥将显示在这里..."></textarea>
       </div>
     </div>
-
+    <!-- 签名验证区域（新增） -->
+    <div class="signature-area" id="signature-area">
+      <div class="signature-title">签名验证</div>
+      <div class="row">
+        <div class="group">
+          <label id="signature-label">生成签名（加密时自动生成）</label>
+          <textarea id="signature-text" placeholder="加密时显示签名，解密时请输入签名"></textarea>
+        </div>
+        <div class="group">
+          <label>验签结果</label>
+          <textarea id="verify-result" readonly placeholder="点击执行后显示验签结果"></textarea>
+          <div class="verify-hint" id="verify-success-hint">验签成功！数据未被篡改</div>
+          <div class="verify-hint" id="verify-fail-hint">验签失败！数据已被篡改或签名错误</div>
+        </div>
+      </div>
+    </div>
     <!-- HmacMD5提示 -->
     <div class="hmac-hint" id="hmac-hint">HmacMD5是哈希算法，仅能生成哈希值，无法解密</div>
-
     <!-- 加密/解密模式选择 -->
     <div class="mode">
       <button class="active" id="encrypt-btn">加密/哈希</button>
       <button id="decrypt-btn">解密</button>
     </div>
-
     <!-- 文本加解密区域（默认显示） -->
     <div class="text-area" id="text-area">
       <div class="row">
@@ -401,7 +434,6 @@
         </div>
       </div>
     </div>
-
     <!-- 文件加解密区域（默认隐藏） -->
     <div class="file-area" id="file-area">
       <p>点击或拖拽文件到此处上传</p>
@@ -409,16 +441,13 @@
       <input type="file" id="file-input" accept=".txt,.json,.csv,.md,.xml">
       <div class="file-info" id="file-info">未选择文件</div>
     </div>
-
     <!-- 执行按钮 -->
     <div class="action">
       <button id="execute-btn">执行</button>
     </div>
   </div>
-
   <!-- 提示框 -->
   <div class="toast" id="toast">操作成功！</div>
-
   <!-- 引入加密库 -->
   <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jsencrypt@3.3.2/bin/jsencrypt.min.js"></script>
@@ -429,8 +458,12 @@
     let currentType = 'text';    // text/file
     let rsaKeyPair = null;       // RSA密钥对
     let selectedFile = null;     // 选中的文件
-
-    // DOM元素
+    // DOM元素（新增签名相关元素）
+    const signatureText = document.getElementById('signature-text');
+    const signatureLabel = document.getElementById('signature-label');
+    const verifyResult = document.getElementById('verify-result');
+    const verifySuccessHint = document.getElementById('verify-success-hint');
+    const verifyFailHint = document.getElementById('verify-fail-hint');
     const mainKeyInput = document.getElementById('main-key');
     const caesarParam = document.getElementById('caesar-param');
     const aesDesMode = document.getElementById('aes-des-mode');
@@ -453,6 +486,7 @@
     // 初始化
     window.onload = () => {
       setDefaultKey();
+      updateSignatureLabel(); // 初始化签名标签
       // 监听加密模式选择（控制偏移量显示）
       modeSelect.addEventListener('change', () => {
         if (modeSelect.value === 'ECB') {
@@ -512,19 +546,17 @@
         document.querySelectorAll('.algo').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentAlgo = btn.dataset.algo;
-
         // 文件模式下禁用RSA/HmacMD5
         if (currentType === 'file' && (currentAlgo === 'rsa' || currentAlgo === 'hmac')) {
           showToast(currentAlgo === 'rsa' ? 'RSA仅支持短文本' : 'HmacMD5不支持文件');
           document.querySelector('.algo[data-algo="aes"]').click();
           return;
         }
-
         // 重置参数显示
         resetParamDisplay();
         setDefaultKey();
         setModeVisibility();
-
+        updateSignatureLabel(); // 更新签名标签
         // 算法特殊处理
         switch (currentAlgo) {
           case 'caesar':
@@ -542,14 +574,20 @@
             break;
           case 'hmac':
             hmacHint.style.display = 'block';
+            signatureText.placeholder = 'HmacMD5哈希值（即签名）';
             break;
         }
+        // 重置签名和验签结果
+        signatureText.value = '';
+        verifyResult.value = '';
+        hideVerifyHints();
       };
     });
 
     // 3. 加密/解密模式切换
     document.getElementById('encrypt-btn').onclick = () => {
       setMode('encrypt');
+      updateSignatureLabel(); // 切换模式时更新签名标签
     };
     document.getElementById('decrypt-btn').onclick = () => {
       // HmacMD5无法解密
@@ -558,14 +596,24 @@
         return;
       }
       setMode('decrypt');
+      updateSignatureLabel(); // 切换模式时更新签名标签
     };
 
     // 4. 执行按钮点击事件
     document.getElementById('execute-btn').onclick = () => {
+      // 隐藏之前的验签提示
+      hideVerifyHints();
+      // HmacMD5特殊处理
       if (currentAlgo === 'hmac' && currentMode === 'decrypt') {
         showToast('HmacMD5无法解密');
         return;
       }
+      // 解密模式下必须输入签名
+      if (currentMode === 'decrypt' && currentAlgo !== 'hmac' && !signatureText.value.trim()) {
+        showToast('请输入签名以验证数据完整性！');
+        return;
+      }
+
       if (currentType === 'text') {
         executeTextCrypto();
       } else {
@@ -608,7 +656,7 @@
     function setDefaultKey() {
       switch (currentAlgo) {
         case 'caesar':
-          mainKeyInput.value = '';
+          mainKeyInput.value = 'caesar_secret'; // 新增签名用密钥
           mainKeyInput.disabled = false;
           ivInput.value = '';
           break;
@@ -662,6 +710,76 @@
       return (bytes / 1048576).toFixed(2) + ' MB';
     }
 
+    // ========== 新增：签名相关函数 ==========
+    // 更新签名标签（根据模式和算法）
+    function updateSignatureLabel() {
+      if (currentAlgo === 'hmac') {
+        signatureLabel.textContent = 'HmacMD5哈希值（即签名）';
+        signatureText.readOnly = currentMode === 'encrypt'; // 加密时只读（自动生成）
+      } else if (currentMode === 'encrypt') {
+        signatureLabel.textContent = '生成签名（加密时自动生成）';
+        signatureText.readOnly = true; // 加密时自动生成，禁止手动输入
+      } else {
+        signatureLabel.textContent = '输入签名（解密时必须验证）';
+        signatureText.readOnly = false; // 解密时需手动输入签名
+      }
+    }
+
+    // 隐藏验签提示
+    function hideVerifyHints() {
+      verifySuccessHint.style.display = 'none';
+      verifyFailHint.style.display = 'none';
+      verifyResult.value = '';
+    }
+
+    // 生成签名（根据算法）
+    function generateSignature(data) {
+      const key = mainKeyInput.value.trim();
+      switch (currentAlgo) {
+        case 'rsa':
+          // RSA：私钥签名
+          if (!rsaKeyPair) throw new Error('RSA密钥对未生成！');
+          const signature = rsaKeyPair.sign(data, CryptoJS.SHA256, 'sha256');
+          if (!signature) throw new Error('RSA签名生成失败！');
+          return signature;
+        case 'hmac':
+          // HmacMD5：直接生成哈希值
+          return handleHmacMD5(data);
+        default:
+          // 凯撒/AES/DES：用HmacMD5辅助签名（密钥+数据）
+          const hmacKey = CryptoJS.enc.Utf8.parse(key);
+          const hmacHash = CryptoJS.HmacMD5(data, hmacKey);
+          return hmacHash.toString(CryptoJS.enc.Hex);
+      }
+    }
+
+    // 验证签名（根据算法）
+    function verifySignature(data, signature) {
+      const key = mainKeyInput.value.trim();
+      try {
+        switch (currentAlgo) {
+          case 'rsa':
+            // RSA：公钥验签
+            if (!rsaKeyPair) throw new Error('RSA密钥对未生成！');
+            const publicKey = document.getElementById('rsa-public-key').value.trim();
+            const verify = new JSEncrypt();
+            verify.setPublicKey(publicKey);
+            return verify.verify(data, signature, CryptoJS.SHA256);
+          case 'hmac':
+            // HmacMD5：重新计算比对
+            const computedHmac = generateSignature(data);
+            return computedHmac === signature;
+          default:
+            // 凯撒/AES/DES：重新计算HmacMD5比对
+            const computedSig = generateSignature(data);
+            return computedSig === signature;
+        }
+      } catch (e) {
+        console.error('验签失败：', e);
+        return false;
+      }
+    }
+
     // ========== 文本加解密（含HmacMD5） ==========
     function executeTextCrypto() {
       const input = inputText.value.trim();
@@ -669,30 +787,75 @@
         showToast('请输入需要处理的内容！');
         return;
       }
-
       let result = '';
+      let signature = '';
       try {
-        switch (currentAlgo) {
-          case 'caesar':
-            result = handleCaesar(input);
-            break;
-          case 'aes':
-            result = handleAES(input);
-            break;
-          case 'des':
-            result = handleDES(input);
-            break;
-          case 'rsa':
-            result = handleRSA(input);
-            break;
-          case 'hmac':
-            result = handleHmacMD5(input);
-            break;
+        // 1. 加密流程：先加密，再生成签名
+        if (currentMode === 'encrypt') {
+          // 执行加密
+          switch (currentAlgo) {
+            case 'caesar':
+              result = handleCaesar(input);
+              break;
+            case 'aes':
+              result = handleAES(input);
+              break;
+            case 'des':
+              result = handleDES(input);
+              break;
+            case 'rsa':
+              result = handleRSA(input);
+              break;
+            case 'hmac':
+              result = handleHmacMD5(input);
+              break;
+          }
+          // 生成签名（用原始输入数据，而非加密后的数据）
+          signature = generateSignature(input);
+          // 显示签名和结果
+          signatureText.value = signature;
+          outputText.value = result;
+          showToast(currentAlgo === 'hmac' ? '哈希生成完成！' : '加密+签名生成完成！');
+
+        // 2. 解密流程：先验证签名，再解密
+        } else {
+          const inputSignature = signatureText.value.trim();
+          // 验证签名（用解密后的原始数据验证）
+          let decryptedData = '';
+          switch (currentAlgo) {
+            case 'caesar':
+              decryptedData = handleCaesar(input);
+              break;
+            case 'aes':
+              decryptedData = handleAES(input);
+              break;
+            case 'des':
+              decryptedData = handleDES(input);
+              break;
+            case 'rsa':
+              decryptedData = handleRSA(input);
+              break;
+          }
+          // 验证签名
+          const isVerified = verifySignature(decryptedData, inputSignature);
+          if (!isVerified) {
+            throw new Error('签名验证失败，数据可能已被篡改！');
+          }
+          // 验签成功，显示结果
+          result = decryptedData;
+          outputText.value = result;
+          verifyResult.value = '验签成功：数据未被篡改';
+          verifySuccessHint.style.display = 'block';
+          showToast('解密+验签完成！');
         }
-        outputText.value = result;
-        showToast(currentAlgo === 'hmac' ? '哈希生成完成！' : `${currentMode === 'encrypt' ? '加密' : '解密'}完成！`);
       } catch (e) {
         outputText.value = '';
+        signatureText.value = currentMode === 'encrypt' ? '' : signatureText.value;
+        // 显示验签失败提示
+        if (currentMode === 'decrypt') {
+          verifyResult.value = `验签失败：${e.message}`;
+          verifyFailHint.style.display = 'block';
+        }
         showToast(`操作失败：${e.message}`);
         console.error(e);
       }
@@ -702,7 +865,6 @@
     function handleCaesar(input) {
       const key = parseInt(document.getElementById('caesar-key').value) || 3;
       let result = '';
-
       for (let i = 0; i < input.length; i++) {
         let char = input[i];
         if (char >= 'A' && char <= 'Z') {
@@ -720,7 +882,6 @@
       const key = CryptoJS.enc.Utf8.parse(mainKeyInput.value);
       const mode = CryptoJS.mode[modeSelect.value];
       const iv = modeSelect.value !== 'ECB' ? CryptoJS.enc.Utf8.parse(ivInput.value) : undefined;
-
       if (currentMode === 'encrypt') {
         const encrypted = CryptoJS.AES.encrypt(input, key, {
           iv: iv,
@@ -743,7 +904,6 @@
       const key = CryptoJS.enc.Utf8.parse(mainKeyInput.value);
       const mode = CryptoJS.mode[modeSelect.value];
       const iv = modeSelect.value !== 'ECB' ? CryptoJS.enc.Utf8.parse(ivInput.value) : undefined;
-
       if (currentMode === 'encrypt') {
         const encrypted = CryptoJS.DES.encrypt(input, key, {
           iv: iv,
@@ -766,7 +926,6 @@
       if (!rsaKeyPair) {
         throw new Error('请先生成RSA密钥对！');
       }
-
       if (currentMode === 'encrypt') {
         const encrypted = rsaKeyPair.encrypt(input);
         if (!encrypted) throw new Error('RSA加密失败，输入内容过长！');
@@ -790,23 +949,26 @@
       const encrypt = new JSEncrypt({ default_key_size: 2048 });
       encrypt.getKey();
       rsaKeyPair = encrypt;
-
       document.getElementById('rsa-public-key').value = encrypt.getPublicKey();
       document.getElementById('rsa-private-key').value = encrypt.getPrivateKey();
       showToast('RSA 2048位密钥对生成成功！');
     }
 
-    // ========== 文件加解密 ==========
+    // ========== 文件加解密（新增签名验证） ==========
     function executeFileCrypto() {
       if (!selectedFile) {
         showToast('请先选择需要处理的文件！');
         return;
       }
-
       // 仅支持文本类文件
       const allowedTypes = ['text/plain', 'application/json', 'text/csv', 'text/markdown', 'text/xml'];
       if (!allowedTypes.includes(selectedFile.type) && !selectedFile.name.match(/\.(txt|json|csv|md|xml)$/i)) {
         showToast('仅支持txt、json、csv、md、xml等文本类文件！');
+        return;
+      }
+      // 解密模式下必须输入签名
+      if (currentMode === 'decrypt' && !signatureText.value.trim()) {
+        showToast('请输入签名以验证文件完整性！');
         return;
       }
 
@@ -815,39 +977,74 @@
         try {
           let fileContent = e.target.result;
           let processedContent = '';
+          let signature = '';
 
-          // 根据算法处理文件内容
-          switch (currentAlgo) {
-            case 'caesar':
-              processedContent = handleCaesar(fileContent);
-              break;
-            case 'aes':
-              processedContent = handleAES(fileContent);
-              break;
-            case 'des':
-              processedContent = handleDES(fileContent);
-              break;
+          // 1. 加密流程：先加密，再生成签名
+          if (currentMode === 'encrypt') {
+            // 执行文件加密
+            switch (currentAlgo) {
+              case 'caesar':
+                processedContent = handleCaesar(fileContent);
+                break;
+              case 'aes':
+                processedContent = handleAES(fileContent);
+                break;
+              case 'des':
+                processedContent = handleDES(fileContent);
+                break;
+            }
+            // 生成签名（用原始文件内容）
+            signature = generateSignature(fileContent);
+            signatureText.value = signature;
+            // 下载加密文件
+            downloadFile(processedContent, selectedFile.name);
+            showToast('文件加密+签名生成完成，文件已下载！');
+
+          // 2. 解密流程：先解密，再验签
+          } else {
+            const inputSignature = signatureText.value.trim();
+            // 执行文件解密
+            switch (currentAlgo) {
+              case 'caesar':
+                processedContent = handleCaesar(fileContent);
+                break;
+              case 'aes':
+                processedContent = handleAES(fileContent);
+                break;
+              case 'des':
+                processedContent = handleDES(fileContent);
+                break;
+            }
+            // 验证签名（用解密后的文件内容）
+            const isVerified = verifySignature(processedContent, inputSignature);
+            if (!isVerified) {
+              throw new Error('文件签名验证失败，文件可能已被篡改！');
+            }
+            // 验签成功，下载解密文件
+            downloadFile(processedContent, selectedFile.name);
+            verifyResult.value = '文件验签成功：数据未被篡改';
+            verifySuccessHint.style.display = 'block';
+            showToast('文件解密+验签完成，文件已下载！');
           }
-
-          // 下载处理后的文件
-          downloadFile(processedContent, selectedFile.name);
-          showToast(currentMode === 'encrypt' ? '加密完成，文件已下载！' : '解密完成，文件已下载！');
         } catch (e) {
+          // 验签失败提示
+          if (currentMode === 'decrypt') {
+            verifyResult.value = `文件验签失败：${e.message}`;
+            verifyFailHint.style.display = 'block';
+          }
           showToast(`文件处理失败：${e.message}`);
           console.error(e);
         }
       };
-
       // 读取文件内容
       reader.readAsText(selectedFile);
     }
 
     // 下载处理后的文件
     function downloadFile(content, originalName) {
-      // 生成新文件名
-      const suffix = currentAlgo === 'hmac' ? '_hmac' : (currentMode === 'encrypt' ? '_encrypted' : '_decrypted');
+      // 生成新文件名（包含签名验证标识）
+      const suffix = currentMode === 'encrypt' ? '_encrypted_with_sign' : '_decrypted_verified';
       const newName = originalName.replace(/(\.\w+)$/, `${suffix}$1`) || `processed_file${suffix}.txt`;
-
       // 创建下载链接
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
