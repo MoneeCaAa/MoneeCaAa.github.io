@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>加解密工具</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: "Inter", "Segoe UI", "PingFang SC", sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: url("https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1600&q=80") center / cover no-repeat fixed;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: -1;
+    }
+    .container {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      padding: 48px 56px;
+      background: rgba(20, 20, 20, 0.65);
+      border-radius: 20px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+      color: #f5f5f5;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    h1 { 
+      text-align: center; 
+      margin-bottom: 36px; 
+      letter-spacing: 3px; 
+      font-weight: 600;
+    }
+    /* 文本/文件切换标签 */
+    .tab-group {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .tab {
+      padding: 10px 24px;
+      border-radius: 999px;
+      border: none;
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all .2s ease;
+    }
+    .tab.active {
+      background: #fff;
+      color: #111;
+      font-weight: 500;
+    }
+    .row { 
+      display: flex; 
+      gap: 28px; 
+      margin-bottom: 28px; 
+      flex-wrap: wrap;
+    }
+    .group { 
+      flex: 1; 
+      min-width: 280px;
+    }
+    label { 
+      display: block; 
+      margin-bottom: 10px; 
+      font-size: 13px; 
+      color: #d1d5db; 
+      font-weight: 400;
+    }
+    .hint {
+      font-size: 12px;
+      color: #fca5a5;
+      margin-top: 4px;
+      display: none;
+    }
+    input, textarea, .param-input, select {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border: none;
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 16px;
+    }
+    input:focus, textarea:focus, .param-input:focus, select:focus {
+      outline: none;
+      background: rgba(255,255,255,0.12);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.2);
+    }
+    textarea { 
+      resize: vertical; 
+      min-height: 130px; 
+      max-height: 300px;
+      line-height: 1.5;
+    }
+    /* 文件上传区域 */
+    .file-area {
+      display: none;
+      padding: 32px 16px;
+      border: 2px dashed rgba(255,255,255,0.2);
+      border-radius: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s ease;
+      margin-bottom: 28px;
+    }
+    .file-area.active {
+      display: block;
+    }
+    .file-area:hover {
+      border-color: rgba(255,255,255,0.4);
+    }
+    .file-area p {
+      color: #d1d5db;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    #file-input {
+      display: none;
+    }
+    .file-btn {
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: none;
+      background: rgba(255,255,255,0.2);
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .file-info {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .algo-list {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .algo {
+      padding: 12px 20px;
+      border-radius: 999px;
+      border: none;
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+      cursor: pointer;
+      transition: all .2s ease;
+      font-size: 14px;
+    }
+    .algo:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    .algo.active {
+      background: #fff;
+      color: #111;
+      font-weight: 500;
+    }
+    .mode { 
+      display: flex; 
+      justify-content: center; 
+      gap: 24px; 
+      margin: 12px 0 36px; 
+    }
+    .mode button {
+      min-width: 120px;
+      padding: 12px 0;
+      border-radius: 999px;
+      border: none;
+      background: #ffffff;
+      color: #111827;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+    .mode button:hover {
+      opacity: 0.9;
+    }
+    .mode button.active { 
+      background: #111827; 
+      color: #ffffff; 
+      border: 1px solid rgba(255,255,255,0.3);
+    }
+    /* HmacMD5特殊提示 */
+    .hmac-hint {
+      text-align: center;
+      color: #fca5a5;
+      font-size: 12px;
+      margin: -20px 0 20px;
+      display: none;
+    }
+    .action { 
+      text-align: center; 
+      margin-top: 40px; 
+    }
+    .action button {
+      padding: 14px 56px;
+      border-radius: 14px;
+      border: none;
+      background: #ffffff;
+      color: #111827;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-weight: 500;
+    }
+    .action button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    }
+    .footer { 
+      margin-top: 40px; 
+      text-align: center; 
+      font-size: 12px; 
+      color: rgba(255,255,255,0.55); 
+      letter-spacing: 1px;
+    }
+    /* 扩展参数区域 */
+    .ext-params {
+      display: flex;
+      gap: 28px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    .param-item {
+      flex: 1;
+      min-width: 280px;
+    }
+    .rsa-keys {
+      display: flex;
+      gap: 28px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    .rsa-key-item {
+      flex: 1;
+      min-width: 280px;
+    }
+    .rsa-key-item textarea {
+      min-height: 100px;
+      font-size: 12px;
+    }
+    .toast {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      background: rgba(255,255,255,0.9);
+      color: #111;
+      border-radius: 999px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      z-index: 9999;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    /* 响应式适配 */
+    @media (max-width: 768px) {
+      .container {
+        padding: 32px 24px;
+      }
+      h1 {
+        font-size: 24px;
+        margin-bottom: 24px;
+      }
+      .row, .ext-params, .rsa-keys {
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      .action button {
+        padding: 12px 40px;
+        width: 100%;
+      }
+      .mode {
+        gap: 16px;
+        margin: 8px 0 24px;
+      }
+      .mode button {
+        min-width: 100px;
+        padding: 10px 0;
+      }
+      .tab-group {
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>加解密工具</h1>
+
+    <!-- 文本/文件切换标签 -->
+    <div class="tab-group">
+      <button class="tab active" data-type="text">文本加解密</button>
+      <button class="tab" data-type="file">文件加解密</button>
+    </div>
+
+    <!-- 算法选择 + 主密钥 -->
+    <div class="row">
+      <div class="group">
+        <label>算法选择</label>
+        <div class="algo-list">
+          <button class="algo active" data-algo="caesar">凯撒密码</button>
+          <button class="algo" data-algo="des">DES</button>
+          <button class="algo" data-algo="aes">AES</button>
+          <button class="algo" data-algo="rsa">RSA</button>
+          <button class="algo" data-algo="hmac">HmacMD5</button>
+        </div>
+      </div>
+      <div class="group">
+        <label>密钥</label>
+        <input id="main-key" placeholder="请输入密钥">
+      </div>
+    </div>
+
+    <!-- 扩展参数区域 -->
+    <div class="ext-params">
+      <!-- 凯撒偏移量 -->
+      <div class="param-item" id="caesar-param">
+        <label>凯撒偏移量（1-25）</label>
+        <input type="number" id="caesar-key" value="3" min="1" max="25" class="param-input">
+      </div>
+      <!-- AES/DES模式+偏移量 -->
+      <div class="param-item" id="aes-des-mode">
+        <label>加密模式</label>
+        <select id="mode-select">
+          <option value="CBC">CBC</option>
+          <option value="ECB">ECB</option>
+          <option value="CFB">CFB</option>
+          <option value="CTR">CTR</option>
+          <option value="OFB">OFB</option>
+        </select>
+        <div class="hint" id="ecb-hint">ECB模式不需要偏移量</div>
+      </div>
+      <div class="param-item" id="aes-des-iv" style="display: block;">
+        <label>偏移量（IV）</label>
+        <input id="iv-input" value="1234567890123456" placeholder="如16位字符串（AES）/8位（DES）" class="param-input">
+      </div>
+    </div>
+
+    <!-- RSA密钥对区域 -->
+    <div class="rsa-keys" id="rsa-keys-area" style="display: none;">
+      <div class="rsa-key-item">
+        <label>RSA公钥</label>
+        <textarea id="rsa-public-key" readonly placeholder="生成的公钥将显示在这里..."></textarea>
+      </div>
+      <div class="rsa-key-item">
+        <label>RSA私钥</label>
+        <textarea id="rsa-private-key" readonly placeholder="生成的私钥将显示在这里..."></textarea>
+      </div>
+    </div>
+
+    <!-- HmacMD5提示 -->
+    <div class="hmac-hint" id="hmac-hint">HmacMD5是哈希算法，仅能生成哈希值，无法解密</div>
+
+    <!-- 加密/解密模式选择 -->
+    <div class="mode">
+      <button class="active" id="encrypt-btn">加密/哈希</button>
+      <button id="decrypt-btn">解密</button>
+    </div>
+
+    <!-- 文本加解密区域（默认显示） -->
+    <div class="text-area" id="text-area">
+      <div class="row">
+        <div class="group">
+          <label>输入内容</label>
+          <textarea id="input-text" placeholder="请输入明文或密文"></textarea>
+        </div>
+        <div class="group output">
+          <label>输出结果</label>
+          <textarea id="output-text" readonly></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- 文件加解密区域（默认隐藏） -->
+    <div class="file-area" id="file-area">
+      <p>点击或拖拽文件到此处上传</p>
+      <button class="file-btn" onclick="document.getElementById('file-input').click()">选择文件</button>
+      <input type="file" id="file-input" accept=".txt,.json,.csv,.md,.xml">
+      <div class="file-info" id="file-info">未选择文件</div>
+    </div>
+
+    <!-- 执行按钮 -->
+    <div class="action">
+      <button id="execute-btn">执行</button>
+    </div>
+  </div>
+
+  <!-- 提示框 -->
+  <div class="toast" id="toast">操作成功！</div>
+
+  <!-- 引入加密库 -->
+  <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsencrypt@3.3.2/bin/jsencrypt.min.js"></script>
+  <script>
+    // 全局状态
+    let currentMode = 'encrypt'; // encrypt/decrypt
+    let currentAlgo = 'caesar';  // caesar/aes/des/rsa/hmac
+    let currentType = 'text';    // text/file
+    let rsaKeyPair = null;       // RSA密钥对
+    let selectedFile = null;     // 选中的文件
+
+    // DOM元素
+    const mainKeyInput = document.getElementById('main-key');
+    const caesarParam = document.getElementById('caesar-param');
+    const aesDesMode = document.getElementById('aes-des-mode');
+    const aesDesIv = document.getElementById('aes-des-iv');
+    const modeSelect = document.getElementById('mode-select');
+    const ecbHint = document.getElementById('ecb-hint');
+    const ivInput = document.getElementById('iv-input');
+    const rsaKeysArea = document.getElementById('rsa-keys-area');
+    const inputText = document.getElementById('input-text');
+    const outputText = document.getElementById('output-text');
+    const toast = document.getElementById('toast');
+    const textArea = document.getElementById('text-area');
+    const fileArea = document.getElementById('file-area');
+    const fileInput = document.getElementById('file-input');
+    const fileInfo = document.getElementById('file-info');
+    const hmacHint = document.getElementById('hmac-hint');
+    const decryptBtn = document.getElementById('decrypt-btn');
+    const encryptBtn = document.getElementById('encrypt-btn');
+
+    // 初始化
+    window.onload = () => {
+      setDefaultKey();
+      // 监听加密模式选择（控制偏移量显示）
+      modeSelect.addEventListener('change', () => {
+        if (modeSelect.value === 'ECB') {
+          aesDesIv.style.display = 'none';
+          ecbHint.style.display = 'block';
+        } else {
+          aesDesIv.style.display = 'block';
+          ecbHint.style.display = 'none';
+        }
+      });
+      // 监听文件选择
+      fileInput.addEventListener('change', handleFileSelect);
+      // 支持拖拽文件
+      fileArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        fileArea.style.borderColor = 'rgba(255,255,255,0.4)';
+      });
+      fileArea.addEventListener('dragleave', () => {
+        fileArea.style.borderColor = 'rgba(255,255,255,0.2)';
+      });
+      fileArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        fileArea.style.borderColor = 'rgba(255,255,255,0.2)';
+        if (e.dataTransfer.files.length > 0) {
+          fileInput.files = e.dataTransfer.files;
+          handleFileSelect({ target: fileInput });
+        }
+      });
+    };
+
+    // 1. 文本/文件标签切换
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.onclick = () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        currentType = tab.dataset.type;
+        
+        // 切换显示区域
+        if (currentType === 'text') {
+          textArea.style.display = 'block';
+          fileArea.style.display = 'none';
+        } else {
+          textArea.style.display = 'none';
+          fileArea.style.display = 'block';
+          // RSA/HmacMD5不支持文件
+          if (currentAlgo === 'rsa' || currentAlgo === 'hmac') {
+            document.querySelector('.algo[data-algo="aes"]').click();
+            showToast(currentAlgo === 'rsa' ? 'RSA不支持文件加解密，已切换为AES' : 'HmacMD5不支持文件操作，已切换为AES');
+          }
+        }
+      };
+    });
+
+    // 2. 算法切换逻辑
+    document.querySelectorAll('.algo').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.algo').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentAlgo = btn.dataset.algo;
+
+        // 文件模式下禁用RSA/HmacMD5
+        if (currentType === 'file' && (currentAlgo === 'rsa' || currentAlgo === 'hmac')) {
+          showToast(currentAlgo === 'rsa' ? 'RSA仅支持短文本' : 'HmacMD5不支持文件');
+          document.querySelector('.algo[data-algo="aes"]').click();
+          return;
+        }
+
+        // 重置参数显示
+        resetParamDisplay();
+        setDefaultKey();
+        setModeVisibility();
+
+        // 算法特殊处理
+        switch (currentAlgo) {
+          case 'caesar':
+            caesarParam.style.display = 'block';
+            break;
+          case 'aes':
+          case 'des':
+            aesDesMode.style.display = 'block';
+            aesDesIv.style.display = modeSelect.value !== 'ECB' ? 'block' : 'none';
+            ecbHint.style.display = modeSelect.value === 'ECB' ? 'block' : 'none';
+            break;
+          case 'rsa':
+            generateRSAKeyPair();
+            rsaKeysArea.style.display = 'flex';
+            break;
+          case 'hmac':
+            hmacHint.style.display = 'block';
+            break;
+        }
+      };
+    });
+
+    // 3. 加密/解密模式切换
+    document.getElementById('encrypt-btn').onclick = () => {
+      setMode('encrypt');
+    };
+    document.getElementById('decrypt-btn').onclick = () => {
+      // HmacMD5无法解密
+      if (currentAlgo === 'hmac') {
+        showToast('HmacMD5是哈希算法，无法解密');
+        return;
+      }
+      setMode('decrypt');
+    };
+
+    // 4. 执行按钮点击事件
+    document.getElementById('execute-btn').onclick = () => {
+      if (currentAlgo === 'hmac' && currentMode === 'decrypt') {
+        showToast('HmacMD5无法解密');
+        return;
+      }
+      if (currentType === 'text') {
+        executeTextCrypto();
+      } else {
+        executeFileCrypto();
+      }
+    };
+
+    // ========== 核心功能函数 ==========
+    // 设置加密/解密模式
+    function setMode(mode) {
+      currentMode = mode;
+      encryptBtn.classList.toggle('active', mode === 'encrypt');
+      decryptBtn.classList.toggle('active', mode === 'decrypt');
+      // HmacMD5仅显示“哈希”
+      encryptBtn.textContent = currentAlgo === 'hmac' ? '生成哈希' : '加密';
+    }
+
+    // 控制解密按钮可见性（HmacMD5隐藏）
+    function setModeVisibility() {
+      if (currentAlgo === 'hmac') {
+        decryptBtn.style.display = 'none';
+        encryptBtn.classList.add('active');
+        currentMode = 'encrypt';
+      } else {
+        decryptBtn.style.display = 'inline-block';
+      }
+    }
+
+    // 重置参数区域显示
+    function resetParamDisplay() {
+      caesarParam.style.display = 'none';
+      aesDesMode.style.display = 'none';
+      aesDesIv.style.display = 'none';
+      ecbHint.style.display = 'none';
+      rsaKeysArea.style.display = 'none';
+      hmacHint.style.display = 'none';
+    }
+
+    // 设置默认密钥+偏移量
+    function setDefaultKey() {
+      switch (currentAlgo) {
+        case 'caesar':
+          mainKeyInput.value = '';
+          mainKeyInput.disabled = false;
+          ivInput.value = '';
+          break;
+        case 'aes':
+          mainKeyInput.value = '1234567890123456';
+          mainKeyInput.disabled = false;
+          ivInput.value = '1234567890123456'; // 16位
+          break;
+        case 'des':
+          mainKeyInput.value = '12345678';
+          mainKeyInput.disabled = false;
+          ivInput.value = '12345678'; // 8位
+          break;
+        case 'rsa':
+          mainKeyInput.value = '自动生成密钥对';
+          mainKeyInput.disabled = true;
+          ivInput.value = '';
+          break;
+        case 'hmac':
+          mainKeyInput.value = 'hmac_secret_key';
+          mainKeyInput.disabled = false;
+          ivInput.value = '';
+          break;
+        default:
+          mainKeyInput.value = '';
+          mainKeyInput.disabled = false;
+      }
+    }
+
+    // 提示框显示
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2000);
+    }
+
+    // 处理文件选择
+    function handleFileSelect(e) {
+      if (e.target.files.length === 0) return;
+      selectedFile = e.target.files[0];
+      fileInfo.textContent = `已选择：${selectedFile.name} (${formatFileSize(selectedFile.size)})`;
+      showToast(`已选择文件：${selectedFile.name}`);
+    }
+
+    // 格式化文件大小
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(2) + ' KB';
+      return (bytes / 1048576).toFixed(2) + ' MB';
+    }
+
+    // ========== 文本加解密（含HmacMD5） ==========
+    function executeTextCrypto() {
+      const input = inputText.value.trim();
+      if (!input) {
+        showToast('请输入需要处理的内容！');
+        return;
+      }
+
+      let result = '';
+      try {
+        switch (currentAlgo) {
+          case 'caesar':
+            result = handleCaesar(input);
+            break;
+          case 'aes':
+            result = handleAES(input);
+            break;
+          case 'des':
+            result = handleDES(input);
+            break;
+          case 'rsa':
+            result = handleRSA(input);
+            break;
+          case 'hmac':
+            result = handleHmacMD5(input);
+            break;
+        }
+        outputText.value = result;
+        showToast(currentAlgo === 'hmac' ? '哈希生成完成！' : `${currentMode === 'encrypt' ? '加密' : '解密'}完成！`);
+      } catch (e) {
+        outputText.value = '';
+        showToast(`操作失败：${e.message}`);
+        console.error(e);
+      }
+    }
+
+    // 凯撒密码（文本）
+    function handleCaesar(input) {
+      const key = parseInt(document.getElementById('caesar-key').value) || 3;
+      let result = '';
+
+      for (let i = 0; i < input.length; i++) {
+        let char = input[i];
+        if (char >= 'A' && char <= 'Z') {
+          char = String.fromCharCode((char.charCodeAt(0) - 65 + (currentMode === 'encrypt' ? key : -key) + 26) % 26 + 65);
+        } else if (char >= 'a' && char <= 'z') {
+          char = String.fromCharCode((char.charCodeAt(0) - 97 + (currentMode === 'encrypt' ? key : -key) + 26) % 26 + 97);
+        }
+        result += char;
+      }
+      return result;
+    }
+
+    // AES（文本）
+    function handleAES(input) {
+      const key = CryptoJS.enc.Utf8.parse(mainKeyInput.value);
+      const mode = CryptoJS.mode[modeSelect.value];
+      const iv = modeSelect.value !== 'ECB' ? CryptoJS.enc.Utf8.parse(ivInput.value) : undefined;
+
+      if (currentMode === 'encrypt') {
+        const encrypted = CryptoJS.AES.encrypt(input, key, {
+          iv: iv,
+          mode: mode,
+          padding: CryptoJS.pad.Pkcs7
+        });
+        return encrypted.toString();
+      } else {
+        const decrypted = CryptoJS.AES.decrypt(input, key, {
+          iv: iv,
+          mode: mode,
+          padding: CryptoJS.pad.Pkcs7
+        });
+        return decrypted.toString(CryptoJS.enc.Utf8);
+      }
+    }
+
+    // DES（文本）
+    function handleDES(input) {
+      const key = CryptoJS.enc.Utf8.parse(mainKeyInput.value);
+      const mode = CryptoJS.mode[modeSelect.value];
+      const iv = modeSelect.value !== 'ECB' ? CryptoJS.enc.Utf8.parse(ivInput.value) : undefined;
+
+      if (currentMode === 'encrypt') {
+        const encrypted = CryptoJS.DES.encrypt(input, key, {
+          iv: iv,
+          mode: mode,
+          padding: CryptoJS.pad.Pkcs7
+        });
+        return encrypted.toString();
+      } else {
+        const decrypted = CryptoJS.DES.decrypt(input, key, {
+          iv: iv,
+          mode: mode,
+          padding: CryptoJS.pad.Pkcs7
+        });
+        return decrypted.toString(CryptoJS.enc.Utf8);
+      }
+    }
+
+    // RSA（文本）
+    function handleRSA(input) {
+      if (!rsaKeyPair) {
+        throw new Error('请先生成RSA密钥对！');
+      }
+
+      if (currentMode === 'encrypt') {
+        const encrypted = rsaKeyPair.encrypt(input);
+        if (!encrypted) throw new Error('RSA加密失败，输入内容过长！');
+        return encrypted;
+      } else {
+        const decrypted = rsaKeyPair.decrypt(input);
+        if (!decrypted) throw new Error('RSA解密失败，请检查密文和私钥！');
+        return decrypted;
+      }
+    }
+
+    // HmacMD5（文本）
+    function handleHmacMD5(input) {
+      const key = CryptoJS.enc.Utf8.parse(mainKeyInput.value);
+      const hash = CryptoJS.HmacMD5(input, key);
+      return hash.toString(CryptoJS.enc.Hex);
+    }
+
+    // 生成RSA密钥对
+    function generateRSAKeyPair() {
+      const encrypt = new JSEncrypt({ default_key_size: 2048 });
+      encrypt.getKey();
+      rsaKeyPair = encrypt;
+
+      document.getElementById('rsa-public-key').value = encrypt.getPublicKey();
+      document.getElementById('rsa-private-key').value = encrypt.getPrivateKey();
+      showToast('RSA 2048位密钥对生成成功！');
+    }
+
+    // ========== 文件加解密 ==========
+    function executeFileCrypto() {
+      if (!selectedFile) {
+        showToast('请先选择需要处理的文件！');
+        return;
+      }
+
+      // 仅支持文本类文件
+      const allowedTypes = ['text/plain', 'application/json', 'text/csv', 'text/markdown', 'text/xml'];
+      if (!allowedTypes.includes(selectedFile.type) && !selectedFile.name.match(/\.(txt|json|csv|md|xml)$/i)) {
+        showToast('仅支持txt、json、csv、md、xml等文本类文件！');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          let fileContent = e.target.result;
+          let processedContent = '';
+
+          // 根据算法处理文件内容
+          switch (currentAlgo) {
+            case 'caesar':
+              processedContent = handleCaesar(fileContent);
+              break;
+            case 'aes':
+              processedContent = handleAES(fileContent);
+              break;
+            case 'des':
+              processedContent = handleDES(fileContent);
+              break;
+          }
+
+          // 下载处理后的文件
+          downloadFile(processedContent, selectedFile.name);
+          showToast(currentMode === 'encrypt' ? '加密完成，文件已下载！' : '解密完成，文件已下载！');
+        } catch (e) {
+          showToast(`文件处理失败：${e.message}`);
+          console.error(e);
+        }
+      };
+
+      // 读取文件内容
+      reader.readAsText(selectedFile);
+    }
+
+    // 下载处理后的文件
+    function downloadFile(content, originalName) {
+      // 生成新文件名
+      const suffix = currentAlgo === 'hmac' ? '_hmac' : (currentMode === 'encrypt' ? '_encrypted' : '_decrypted');
+      const newName = originalName.replace(/(\.\w+)$/, `${suffix}$1`) || `processed_file${suffix}.txt`;
+
+      // 创建下载链接
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = newName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
